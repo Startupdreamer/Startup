@@ -1,5 +1,34 @@
 // 平滑滚动
 document.addEventListener('DOMContentLoaded', function() {
+    // 汉堡菜单交互
+    const menuToggle = document.querySelector('.menu-toggle');
+    const navLinks = document.querySelector('.nav-links');
+    
+    if (menuToggle && navLinks) {
+        menuToggle.addEventListener('click', function(e) {
+            e.stopPropagation(); // 防止事件冒泡
+            menuToggle.classList.toggle('active');
+            navLinks.classList.toggle('active');
+            console.log('Menu toggle clicked, active:', menuToggle.classList.contains('active'));
+        });
+        
+        // 点击导航链接后关闭菜单
+        navLinks.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', function() {
+                menuToggle.classList.remove('active');
+                navLinks.classList.remove('active');
+            });
+        });
+        
+        // 点击页面其他地方关闭菜单
+        document.addEventListener('click', function(e) {
+            if (!menuToggle.contains(e.target) && !navLinks.contains(e.target)) {
+                menuToggle.classList.remove('active');
+                navLinks.classList.remove('active');
+            }
+        });
+    }
+    
     // 平滑滚动到锚点
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function (e) {
@@ -18,9 +47,9 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('scroll', function() {
         const navbar = document.querySelector('.navbar');
         if (window.scrollY > 100) {
-            navbar.style.backgroundColor = 'rgba(11, 15, 25, 0.98)';
+            navbar.style.backgroundColor = 'rgba(255, 255, 255, 0.99)';
         } else {
-            navbar.style.backgroundColor = 'rgba(11, 15, 25, 0.95)';
+            navbar.style.backgroundColor = 'rgba(255, 255, 255, 0.98)';
         }
     });
 
@@ -298,12 +327,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 动态添加随机噪点背景效果
+    // 晕染流体效果
     const heroSection = document.querySelector('.hero');
     if (heroSection) {
         heroSection.style.position = 'relative';
         
-        // 创建噪点 canvas
+        // 创建晕染 canvas
         const canvas = document.createElement('canvas');
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -313,39 +342,157 @@ document.addEventListener('DOMContentLoaded', function() {
         canvas.style.right = '0';
         canvas.style.bottom = '0';
         canvas.style.zIndex = '1';
-        canvas.style.opacity = '0.03';
+        canvas.style.opacity = '0.6';
         heroSection.appendChild(canvas);
         
         const ctx = canvas.getContext('2d');
-        const imageData = ctx.createImageData(canvas.width, canvas.height);
-        const data = imageData.data;
         
-        for (let i = 0; i < data.length; i += 4) {
-            const value = Math.random() * 255;
-            data[i] = value;     // R
-            data[i + 1] = value; // G
-            data[i + 2] = value; // B
-            data[i + 3] = 255;   // A
+        // 晕染粒子类
+        class SmokeParticle {
+            constructor(x, y) {
+                // 初始位置：左下区域
+                this.x = x || Math.random() * canvas.width * 0.3;
+                this.y = y || canvas.height * 0.7 + Math.random() * canvas.height * 0.3;
+                // 速度：缓慢向右上流动
+                this.vx = Math.random() * 0.8 + 0.2; // 0.2-1 向右
+                this.vy = -(Math.random() * 0.8 + 0.2); // -1 到 -0.2 向上
+                this.baseSize = Math.random() * 150 + 100; // 100-250，非常大的粒子
+                this.size = this.baseSize;
+                this.life = Math.random() * 3 + 2; // 更长的生命周期
+                this.decay = Math.random() * 0.003 + 0.001; // 更慢的衰减
+                this.color = this.getColor();
+                this.pulse = Math.random() * Math.PI * 2;
+                this.alpha = Math.random() * 0.3 + 0.2; // 0.2-0.5 的透明度
+            }
+            
+            getColor() {
+                const colors = [
+                    { r: 255, g: 127, b: 0 },     // 主橙色 (#FF7F00)
+                    { r: 255, g: 165, b: 0 },     // 橙色
+                    { r: 255, g: 193, b: 7 },     // 浅橙色
+                    { r: 255, g: 215, b: 0 }      // 金色
+                ];
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+            
+            update() {
+                // 流体运动 - 更平滑的流动
+                this.vx += (Math.random() - 0.5) * 0.2;
+                this.vy += (Math.random() - 0.5) * 0.2;
+                
+                // 保持向右上的主要方向
+                if (this.vx < 0.3) this.vx = 0.3;
+                if (this.vy > -0.3) this.vy = -0.3;
+                
+                // 限制速度，保持平滑流动
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (speed > 2.5) {
+                    this.vx = (this.vx / speed) * 2.5;
+                    this.vy = (this.vy / speed) * 2.5;
+                }
+                
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                // 生命周期
+                this.life -= this.decay;
+                
+                // 脉动效果 - 更柔和的变化
+                this.pulse += 0.05;
+                this.size = this.baseSize * (0.9 + 0.1 * Math.sin(this.pulse));
+                
+                // 边界检测 - 只在离开右上区域时重新生成
+                if (this.x > canvas.width + 50 || this.y < -50) {
+                    // 重新生成在左下区域
+                    this.x = Math.random() * canvas.width * 0.3;
+                    this.y = canvas.height * 0.7 + Math.random() * canvas.height * 0.3;
+                    this.life = Math.random() * 1.5 + 0.5;
+                    this.decay = Math.random() * 0.005 + 0.002;
+                    this.color = this.getColor();
+                }
+            }
+            
+            draw() {
+                if (this.life <= 0) return;
+                
+                ctx.save();
+                
+                // 使用固定透明度，创造更稳定的光晕效果
+                const alpha = this.alpha * this.life;
+                
+                // 创建径向渐变
+                const gradient = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, this.size
+                );
+                
+                // 更柔和的渐变效果
+                gradient.addColorStop(0, `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${alpha * 0.6})`);
+                gradient.addColorStop(0.3, `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${alpha * 0.3})`);
+                gradient.addColorStop(0.7, `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${alpha * 0.1})`);
+                gradient.addColorStop(1, `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, 0)`);
+                
+                // 绘制晕染效果
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
         }
         
-        ctx.putImageData(imageData, 0, 0);
+        // 创建粒子数组
+        const particles = [];
+        const particleCount = 3; // 2-3个很大的粒子
         
-        // 窗口大小改变时重新绘制
+        // 初始化粒子 - 全部从左下区域开始
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new SmokeParticle());
+        }
+        
+        // 动画循环
+        function animate() {
+            // 清空画布（使用更透明的颜色，创造更柔和的拖尾效果）
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 应用更大的模糊滤镜，创造更柔和的光晕效果
+            ctx.filter = 'blur(35px)';
+            
+            // 更新和绘制粒子
+            particles.forEach((particle, index) => {
+                particle.update();
+                particle.draw();
+                
+                // 移除死亡粒子并在左下区域创建新粒子
+                if (particle.life <= 0) {
+                    particles[index] = new SmokeParticle();
+                }
+            });
+            
+            // 重置滤镜
+            ctx.filter = 'none';
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // 开始动画
+        animate();
+        
+        // 窗口大小改变时重新调整画布
         window.addEventListener('resize', function() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            const newImageData = ctx.createImageData(canvas.width, canvas.height);
-            const newData = newImageData.data;
             
-            for (let i = 0; i < newData.length; i += 4) {
-                const value = Math.random() * 255;
-                newData[i] = value;
-                newData[i + 1] = value;
-                newData[i + 2] = value;
-                newData[i + 3] = 255;
+            // 重新初始化粒子
+            particles.length = 0;
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new SmokeParticle(
+                    Math.random() * canvas.width,
+                    Math.random() * canvas.height
+                ));
             }
-            
-            ctx.putImageData(newImageData, 0, 0);
         });
     }
 
